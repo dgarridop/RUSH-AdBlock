@@ -1,0 +1,36 @@
+
+name: RUSH AdBlock - Environment Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  environment:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check macOS
+        run: sw_vers
+
+      - name: Check Xcode
+        run: xcodebuild -version
+
+      - name: Check iOS SDK
+        run: xcodebuild -showsdks
+
+      - name: Inspect project files
+        run: |
+          find . -maxdepth 5 \
+            \( -name "*.xcodeproj" \
+            -o -name "*.xcworkspace" \
+            -o -name "Package.swift" \) \
+            -print
