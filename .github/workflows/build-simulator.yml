@@ -1,0 +1,43 @@
+name: RUSH AdBlock - Build Simulator
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build SimpleURLFilter for iOS Simulator (no signing)
+        run: |
+          set -o pipefail
+          cd vendor/Apple-SimpleURLFilter
+          xcodebuild build \
+            -workspace SimpleURLFilter.xcworkspace \
+            -scheme SimpleURLFilter \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Result and errors
+        if: always()
+        run: |
+          grep -nE "error:|BUILD (SUCCEEDED|FAILED)" "$RUNNER_TEMP/build.log" || true
+
+      - name: Signing and entitlement messages
+        if: always()
+        run: |
+          grep -niE "entitle|provisioning|signing|team" "$RUNNER_TEMP/build.log" | head -60 || true
+
+      - name: Built products
+        if: always()
+        run: |
+          find "$RUNNER_TEMP/dd/Build/Products" \( -name "*.app" -o -name "*.appex" \) -print || true
