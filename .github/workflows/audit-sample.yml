@@ -1,0 +1,73 @@
+name: RUSH AdBlock - Audit Sample
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E "iOS" || true
+
+      - name: Projects and workspaces
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          find . \( -name "*.xcodeproj" -o -name "*.xcworkspace" \) -not -path "*/project.xcworkspace" -print
+          echo "=== contents.xcworkspacedata ==="
+          cat SimpleURLFilter.xcworkspace/contents.xcworkspacedata
+
+      - name: Shared schemes on disk
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          find . -name "*.xcscheme" -print
+
+      - name: Package dependencies (Package.resolved)
+        run: |
+          cat vendor/Apple-SimpleURLFilter/SimpleURLFilter.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      - name: Resolve packages (no build)
+        continue-on-error: true
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          xcodebuild -resolvePackageDependencies -workspace SimpleURLFilter.xcworkspace -scheme SimpleURLFilter
+
+      - name: List per project
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          for p in SimpleURLFilter/SimpleURLFilter.xcodeproj SwiftBloomFilter/SwiftBloomFilter.xcodeproj BloomFilterTool/BloomFilterTool.xcodeproj; do
+            echo "=== xcodebuild -list -project $p ==="
+            xcodebuild -list -project "$p" || true
+          done
+          echo "=== xcodebuild -list -workspace ==="
+          xcodebuild -list -workspace SimpleURLFilter.xcworkspace || true
+
+      - name: Entitlements, Info.plist and xcconfig
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          for f in $(find . -name "*.entitlements"); do
+            echo "=== $f ==="
+            cat "$f"
+          done
+          echo "=== SimpleURLFilterExtension/Info.plist ==="
+          cat SimpleURLFilter/SimpleURLFilterExtension/Info.plist
+          echo "=== Configuration/SampleCode.xcconfig ==="
+          cat Configuration/SampleCode.xcconfig
+
+      - name: Key build settings per scheme
+        continue-on-error: true
+        run: |
+          cd vendor/Apple-SimpleURLFilter
+          for s in SimpleURLFilter SimpleURLFilterExtension; do
+            echo "=== showBuildSettings scheme $s ==="
+            xcodebuild -showBuildSettings -workspace SimpleURLFilter.xcworkspace -scheme "$s" \
+              | grep -E "^\s*(PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS|CODE_SIGN_STYLE|DEVELOPMENT_TEAM|IPHONEOS_DEPLOYMENT_TARGET|SUPPORTED_PLATFORMS|SWIFT_VERSION|SDKROOT) =" || true
+          done
